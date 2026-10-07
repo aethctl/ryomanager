@@ -19,6 +19,7 @@ export type SystemInfo = {
 
 export type Snapshot = {
   timestampMs: number;
+  accent: string;
   cpu: number;
   totalMemory: number;
   usedMemory: number;

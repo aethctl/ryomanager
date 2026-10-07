@@ -30,29 +30,34 @@
     width: 100%;
     height: 42px;
   }
+
   .graph.tall {
     height: 220px;
   }
+
   svg {
     display: block;
     width: 100%;
     height: 100%;
     overflow: visible;
   }
+
   .grid {
     stroke: var(--ryo-line-soft);
     stroke-width: .28;
     vector-effect: non-scaling-stroke;
   }
+
   .fill {
-    fill: color-mix(in srgb, var(--ryo-ink) 5%, transparent);
+    fill: color-mix(in srgb, var(--ryo-focus) 10%, transparent);
   }
+
   .line {
     fill: none;
-    stroke: var(--ryo-ink);
-    stroke-width: .8;
+    stroke: var(--ryo-focus);
+    stroke-width: .85;
     vector-effect: non-scaling-stroke;
-    stroke-linejoin: round;
-    stroke-linecap: round;
+    stroke-linejoin: miter;
+    stroke-linecap: square;
   }
 </style>

@@ -1,5 +1,6 @@
 use serde::Serialize;
-use std::sync::Mutex;
+use serde_json::Value;
+use std::{path::PathBuf, sync::Mutex};
 use sysinfo::{
     CpuRefreshKind, MemoryRefreshKind, ProcessRefreshKind, RefreshKind, System, UpdateKind,
 };
@@ -48,6 +49,7 @@ struct SystemInfo {
 #[serde(rename_all = "camelCase")]
 struct Snapshot {
     timestamp_ms: u128,
+    accent: String,
     cpu: f32,
     total_memory: u64,
     used_memory: u64,
@@ -56,6 +58,44 @@ struct Snapshot {
     process_count: usize,
     processes: Vec<ProcessInfo>,
     system: SystemInfo,
+}
+
+
+fn ryoku_palette_path() -> Option<PathBuf> {
+    if let Some(cache_home) = std::env::var_os("XDG_CACHE_HOME") {
+        return Some(PathBuf::from(cache_home).join("ryoku/colors.json"));
+    }
+
+    std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .map(|home| home.join(".cache/ryoku/colors.json"))
+}
+
+fn ryoku_accent() -> String {
+    const FALLBACK: &str = "#7898a5";
+
+    let Some(path) = ryoku_palette_path() else {
+        return FALLBACK.into();
+    };
+
+    let Ok(raw) = std::fs::read_to_string(path) else {
+        return FALLBACK.into();
+    };
+
+    let Ok(palette) = serde_json::from_str::<Value>(&raw) else {
+        return FALLBACK.into();
+    };
+
+    palette
+        .get("primary")
+        .and_then(Value::as_str)
+        .filter(|value| {
+            value.len() == 7
+                && value.starts_with('#')
+                && value[1..].chars().all(|c| c.is_ascii_hexdigit())
+        })
+        .unwrap_or(FALLBACK)
+        .to_string()
 }
 
 #[tauri::command]
@@ -100,6 +140,7 @@ fn snapshot(state: tauri::State<'_, AppState>) -> Snapshot {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_millis(),
+        accent: ryoku_accent(),
         cpu: system.global_cpu_usage(),
         total_memory: system.total_memory(),
         used_memory: system.used_memory(),
@@ -133,8 +174,28 @@ fn end_process(pid: u32, force: bool) -> Result<(), String> {
     }
 }
 
+#[cfg(target_os = "linux")]
+fn normalize_gtk_dpi() {
+    use gtk::prelude::*;
+
+    if gtk::init().is_ok() {
+        if let Some(settings) = gtk::Settings::default() {
+            settings.set_property("gtk-xft-dpi", 96 * 1024i32);
+        }
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn normalize_gtk_dpi() {}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // WebKitGTK can inherit a wildly inflated Xft DPI on some Wayland sessions,
+    // shrinking CSS layout to a fraction of the intended size. Normalise only
+    // this process before Tauri creates its WebView, matching Ryoku's other
+    // WebKit surfaces without changing the user's desktop DPI.
+    normalize_gtk_dpi();
+
     tauri::Builder::default()
         .manage(AppState {
             system: Mutex::new(System::new_with_specifics(live_refresh_kind())),
