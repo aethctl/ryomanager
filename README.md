@@ -6,20 +6,19 @@ The goal is simple: make processes and performance understandable at a glance, t
 
 ## Current foundation
 
-The first working build includes:
+The current build includes:
 
-- live process list with a selectable refresh interval: live, 1 minute or 3 minutes
-- search by process name, command or PID
-- sorting by name, PID, CPU and memory
-- safe End Task (`SIGTERM`) and Force Stop (`SIGKILL`) actions
-- live CPU and memory summaries
-- 60-second CPU and memory performance graphs
-- CPU model, core and logical processor information
-- memory, availability and swap information
-- system identity page for hostname, OS and kernel
+- processes grouped the way a desktop sees them: Apps (anything that owns a window), Background and System, with every launch of one application merged under one row that expands to its processes
+- group identity from the systemd unit and the desktop entry, with names and icons from the entry and descriptions from the unit
+- per-process CPU, private memory, disk throughput, GPU engine use, an energy estimate, state, PID, threads, user, nice, start time, unit, open sockets and swap, with a column chooser
+- an inspector with exact memory (PSS and its composition), open files, context switches, OOM score, windows, members and actions: End task, Force stop, Suspend and Resume, priority, Open location, Copy command, every one tied to the process identity (PID plus start time) so a recycled PID is never acted on
+- a Performance page with a resource rail (CPU, memory, each disk, each network interface, each GPU, energy, thermals), 60-sample graphs with gaps where sampling paused, per-logical-processor view, memory and swap composition, disk and network link details, GPU memory and codec engines, battery and package power, sensor tables, and the processes driving each resource
+- readings the system refuses (another user's counters, root-only power counters) shown as unavailable with the reason, never as zero
+- a selectable refresh interval: live, 1 minute or 3 minutes
+- a system identity page for hostname, OS and kernel
 - Ryoku/Ryotunes-inspired monochrome application UI
 
-Startup applications, services, process grouping, GPU, disk, network and deeper process inspection are planned as first-class pages rather than bolt-on terminal widgets.
+Startup applications and services are planned as first-class pages.
 
 ## Development
 
