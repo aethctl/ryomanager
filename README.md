@@ -8,7 +8,7 @@ The goal is simple: make processes and performance understandable at a glance, t
 
 The first working build includes:
 
-- live process list with 1-second refresh
+- live process list with a selectable refresh interval: live, 1 minute or 3 minutes
 - search by process name, command or PID
 - sorting by name, PID, CPU and memory
 - safe End Task (`SIGTERM`) and Force Stop (`SIGKILL`) actions

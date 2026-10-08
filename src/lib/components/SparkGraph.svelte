@@ -49,12 +49,12 @@
   }
 
   .fill {
-    fill: color-mix(in srgb, var(--ryo-focus) 10%, transparent);
+    fill: color-mix(in srgb, var(--ryo-signal) 10%, transparent);
   }
 
   .line {
     fill: none;
-    stroke: var(--ryo-focus);
+    stroke: var(--ryo-signal);
     stroke-width: .85;
     vector-effect: non-scaling-stroke;
     stroke-linejoin: miter;

@@ -2,10 +2,11 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import SparkGraph from "./lib/components/SparkGraph.svelte";
-  import type { Snapshot } from "./lib/types";
+  import type { ProcessInfo, Snapshot } from "./lib/types";
 
   type Page = "processes" | "performance" | "system";
   type SortKey = "name" | "cpu" | "memory" | "pid";
+  type Interval = "live" | "minute" | "three";
 
   let page: Page = "processes";
   let snapshot: Snapshot | null = null;
@@ -18,8 +19,18 @@
   let busy = false;
   let error = "";
   let selectedMetric: "cpu" | "memory" = "cpu";
+  let interval: Interval = "live";
+  let inspected: ProcessInfo | null = null;
+  let inspectedHistory: number[] = [];
+  let historyPid: number | null = null;
 
   const historyLimit = 60;
+
+  const intervals: { id: Interval; label: string; ms: number }[] = [
+    { id: "live", label: "LIVE", ms: 1000 },
+    { id: "minute", label: "1 MIN", ms: 60_000 },
+    { id: "three", label: "3 MIN", ms: 180_000 },
+  ];
 
   const formatBytes = (bytes: number) => {
     const units = ["B", "KB", "MB", "GB", "TB"];
@@ -34,6 +45,12 @@
 
   const pct = (value: number) => `${Math.max(0, value).toFixed(value >= 10 ? 0 : 1)}%`;
 
+  $: period = intervals.find((option) => option.id === interval) ?? intervals[0];
+  $: historySeconds = (period.ms * historyLimit) / 1000;
+
+  const formatWindow = (seconds: number) =>
+    seconds < 90 ? `${seconds} s` : `${Math.round(seconds / 60)} min`;
+
   async function refresh() {
     try {
       const next = await invoke<Snapshot>("snapshot");
@@ -41,6 +58,12 @@
       cpuHistory = [...cpuHistory, next.cpu].slice(-historyLimit);
       const memoryPct = next.totalMemory > 0 ? (next.usedMemory / next.totalMemory) * 100 : 0;
       memoryHistory = [...memoryHistory, memoryPct].slice(-historyLimit);
+      if (selectedPid !== historyPid) inspectedHistory = [];
+      historyPid = selectedPid;
+      const current = selectedPid === null
+        ? undefined
+        : next.processes.find((process) => process.pid === selectedPid);
+      inspectedHistory = current ? [...inspectedHistory, current.cpu].slice(-historyLimit) : [];
       error = "";
     } catch (cause) {
       error = String(cause);
@@ -69,6 +92,11 @@
     }
   }
 
+  function openProcess(pid: number) {
+    selectedPid = pid;
+    page = "processes";
+  }
+
   $: processes = snapshot?.processes ?? [];
   $: filtered = processes
     .filter((process) => {
@@ -85,6 +113,7 @@
       return sortDescending ? -result : result;
     });
   $: selected = selectedPid === null ? null : processes.find((process) => process.pid === selectedPid) ?? null;
+  $: if (selected) inspected = selected;
   $: memoryPercent = snapshot && snapshot.totalMemory > 0 ? (snapshot.usedMemory / snapshot.totalMemory) * 100 : 0;
   $: cpuLeaders = [...processes].sort((a, b) => b.cpu - a.cpu).slice(0, 5);
   $: memoryLeaders = [...processes].sort((a, b) => b.memory - a.memory).slice(0, 5);
@@ -92,9 +121,14 @@
   onMount(() => {
     let stopped = false;
     let timer = 0;
+    let lastRefresh = 0;
 
     async function tick() {
-      if (!stopped && document.visibilityState === "visible") await refresh();
+      const now = Date.now();
+      if (!stopped && document.visibilityState === "visible" && now - lastRefresh >= period.ms) {
+        lastRefresh = now;
+        await refresh();
+      }
       if (!stopped) timer = window.setTimeout(tick, 1000);
     }
 
@@ -127,24 +161,24 @@
       <div class="nav-group">
         <div class="nav-heading"><span>01</span><b>MONITOR</b><i></i></div>
         <button class:active={page === "processes"} onclick={() => page = "processes"}>
-          <span class="nav-prefix">//</span><span>Processes</span><span class="nav-jp">処理</span>
+          <span>Processes</span><span class="nav-jp">処理</span>
         </button>
         <button class:active={page === "performance"} onclick={() => page = "performance"}>
-          <span class="nav-prefix">//</span><span>Performance</span><span class="nav-jp">性能</span>
+          <span>Performance</span><span class="nav-jp">性能</span>
         </button>
         <button class:active={page === "system"} onclick={() => page = "system"}>
-          <span class="nav-prefix">//</span><span>System</span><span class="nav-jp">機体</span>
+          <span>System</span><span class="nav-jp">機体</span>
         </button>
       </div>
 
       <div class="nav-group">
         <div class="nav-heading"><span>02</span><b>CONTROL</b><i></i></div>
-        <button class="future" disabled>
-          <span class="nav-prefix">//</span><span>Startup</span><span class="nav-jp">起動</span><small>NEXT</small>
-        </button>
-        <button class="future" disabled>
-          <span class="nav-prefix">//</span><span>Services</span><span class="nav-jp">服務</span><small>NEXT</small>
-        </button>
+          <button class="future" disabled>
+            <span>Startup</span><span class="nav-jp">起動</span><small>NEXT</small>
+          </button>
+          <button class="future" disabled>
+            <span>Services</span><span class="nav-jp">服務</span><small>NEXT</small>
+          </button>
       </div>
     </nav>
 
@@ -196,16 +230,21 @@
           </div>
         </div>
 
-        <div class="summary-strip panel-ticks">
+        <div class="summary-strip">
           <div><span>CPU LOAD</span><strong>{snapshot ? pct(snapshot.cpu) : "—"}</strong><SparkGraph values={cpuHistory} /></div>
           <div><span>MEMORY FIELD</span><strong>{snapshot ? `${formatBytes(snapshot.usedMemory)} / ${formatBytes(snapshot.totalMemory)}` : "—"}</strong><SparkGraph values={memoryHistory} /></div>
-          <div><span>VISIBLE PROCESSES</span><strong>{snapshot?.processCount ?? "—"}</strong><small>1 s acquisition interval</small></div>
+          <div><span>VISIBLE PROCESSES</span><strong>{snapshot?.processCount ?? "—"}</strong><small>refresh {formatWindow(period.ms / 1000)}</small></div>
         </div>
 
-        <div class="process-workspace">
+        <div class="process-workspace" class:inspecting={selected !== null}>
           <div class="process-table-shell">
             <div class="table-kicker">
-              <span>PROCESS INDEX // LIVE</span>
+              <span>PROCESS INDEX</span>
+              <div class="interval-switch" role="group" aria-label="Refresh interval">
+                {#each intervals as option (option.id)}
+                  <button class:active={interval === option.id} onclick={() => interval = option.id}>{option.label}</button>
+                {/each}
+              </div>
               <span>{filtered.length} VISIBLE</span>
             </div>
             <div class="process-header process-grid">
@@ -233,35 +272,30 @@
             </div>
           </div>
 
-          <aside class="process-inspector" class:empty={!selected}>
-            {#if selected}
+          <aside class="process-inspector" class:open={selected !== null}>
+            {#if inspected}
               <div class="inspector-head">
                 <span>SELECTED PROCESS</span>
-                <strong>{selected.name}</strong>
-                <small>PID {selected.pid}</small>
+                <strong>{inspected.name}</strong>
+                <small>PID {inspected.pid}</small>
+                <div class="inspector-actions">
+                  <button class="button" disabled={!selected || busy} onclick={() => endSelected(false)}>End task</button>
+                  <button class="button danger" disabled={!selected || busy} onclick={() => endSelected(true)}>Force stop</button>
+                </div>
               </div>
-              <div class="inspector-metrics">
-                <div><span>CPU</span><strong>{pct(selected.cpu)}</strong></div>
-                <div><span>MEMORY</span><strong>{formatBytes(selected.memory)}</strong></div>
-                <div><span>STATE</span><strong>{selected.status}</strong></div>
-                <div><span>PARENT</span><strong>{selected.parentPid ?? "—"}</strong></div>
+              <div class="inspector-graph">
+                <div class="inspector-graph-head"><span>CPU</span><strong>{pct(inspected.cpu)}</strong></div>
+                <SparkGraph values={inspectedHistory} label="Process CPU history" />
               </div>
-              <div class="inspector-command">
-                <span>COMMAND</span>
-                <code>{selected.command || "No command line exposed"}</code>
+              <div class="inspector-share">
+                <div class="inspector-graph-head"><span>MEMORY SHARE</span><strong>{formatBytes(inspected.memory)}</strong></div>
+                <i style={`--share:${snapshot?.totalMemory ? Math.min(100, (inspected.memory / snapshot.totalMemory) * 100) : 0}%`}></i>
+                <small>{snapshot && snapshot.totalMemory ? pct((inspected.memory / snapshot.totalMemory) * 100) : "—"} of {snapshot ? formatBytes(snapshot.totalMemory) : "—"}</small>
               </div>
-              <div class="inspector-actions">
-                <button class="button" disabled={busy} onclick={() => endSelected(false)}>End task</button>
-                <button class="button danger" disabled={busy} onclick={() => endSelected(true)}>Force stop</button>
-              </div>
-            {:else}
-              <div class="inspector-empty-mark">力</div>
-              <strong>Select a process</strong>
-              <p>Inspect CPU, memory, state and command details without leaving the process list.</p>
-              <div class="inspector-overview">
-                <span><small>CPU</small><b>{snapshot ? pct(snapshot.cpu) : "—"}</b></span>
-                <span><small>MEM</small><b>{snapshot ? pct(memoryPercent) : "—"}</b></span>
-                <span><small>PROC</small><b>{snapshot?.processCount ?? "—"}</b></span>
+              <div class="inspector-registry">
+                <div><span>STATE</span><strong>{inspected.status}</strong></div>
+                <div><span>PARENT PID</span><strong>{inspected.parentPid ?? "—"}</strong></div>
+                <div class="wide"><span>COMMAND</span><code>{inspected.command || "No command line exposed"}</code></div>
               </div>
             {/if}
           </aside>
@@ -273,74 +307,43 @@
           <div class="title-block">
             <div class="section-label"><i></i><span class="section-mark">力</span> SYSTEM / PERFORMANCE <span>性能</span><b>02</b></div>
             <h1>Performance</h1>
-            <p>Live system telemetry with sixty seconds of readable history.</p>
+            <p>CPU and memory over the last {formatWindow(historySeconds)}, and the processes driving them.</p>
           </div>
         </div>
 
-        <div class="performance-layout">
-          <div class="metric-rail">
-            <button class:active={selectedMetric === "cpu"} onclick={() => selectedMetric = "cpu"}>
-              <div><span>CPU</span><strong>{snapshot ? pct(snapshot.cpu) : "—"}</strong></div>
-              <SparkGraph values={cpuHistory} />
-              <small>処理装置 / PROCESSOR</small>
-            </button>
-            <button class:active={selectedMetric === "memory"} onclick={() => selectedMetric = "memory"}>
-              <div><span>MEMORY</span><strong>{snapshot ? pct(memoryPercent) : "—"}</strong></div>
-              <SparkGraph values={memoryHistory} />
-              <small>記憶領域 / MEMORY</small>
-            </button>
+        <div class="performance-grid">
+          <div class="perf-card">
+            <div class="perf-card-head"><span>CPU</span><strong>{snapshot ? pct(snapshot.cpu) : "—"}</strong></div>
+            <SparkGraph values={cpuHistory} tall label="CPU history" />
+            <div class="perf-card-foot">
+              <span>{snapshot?.system.cpuModel ?? "Detecting processor…"}</span>
+              <span>{snapshot?.system.physicalCores ?? "—"} cores / {snapshot?.system.logicalCpus ?? "—"} threads</span>
+            </div>
           </div>
-
-          <div class="performance-main panel-ticks">
-            {#if selectedMetric === "cpu"}
-              <div class="metric-title"><div><div class="section-label">PROCESSOR // CPU</div><h2>Compute load</h2></div><span>{snapshot?.system.cpuModel ?? "Detecting processor…"}</span></div>
-              <div class="big-number">{snapshot ? pct(snapshot.cpu) : "—"}</div>
-              <div class="chart-frame"><span class="chart-top">100%</span><span class="chart-bottom">0%</span><SparkGraph values={cpuHistory} tall /></div>
-              <div class="detail-grid">
-                <div><span>PROCESSES</span><strong>{snapshot?.processCount ?? "—"}</strong></div>
-                <div><span>PHYSICAL CORES</span><strong>{snapshot?.system.physicalCores ?? "—"}</strong></div>
-                <div><span>LOGICAL THREADS</span><strong>{snapshot?.system.logicalCpus ?? "—"}</strong></div>
-                <div><span>ACQUISITION</span><strong>1 s</strong></div>
-              </div>
-            {:else}
-              <div class="metric-title"><div><div class="section-label">PHYSICAL MEMORY // RAM</div><h2>Memory field</h2></div><span>{snapshot ? formatBytes(snapshot.totalMemory) : "—"} installed</span></div>
-              <div class="big-number">{snapshot ? pct(memoryPercent) : "—"}</div>
-              <div class="chart-frame"><span class="chart-top">100%</span><span class="chart-bottom">0%</span><SparkGraph values={memoryHistory} tall /></div>
-              <div class="detail-grid">
-                <div><span>IN USE</span><strong>{snapshot ? formatBytes(snapshot.usedMemory) : "—"}</strong></div>
-                <div><span>AVAILABLE</span><strong>{snapshot ? formatBytes(snapshot.totalMemory - snapshot.usedMemory) : "—"}</strong></div>
-                <div><span>SWAP</span><strong>{snapshot ? `${formatBytes(snapshot.usedSwap)} / ${formatBytes(snapshot.totalSwap)}` : "—"}</strong></div>
-                <div><span>UTILISATION</span><strong>{snapshot ? pct(memoryPercent) : "—"}</strong></div>
-              </div>
-            {/if}
+          <div class="perf-card">
+            <div class="perf-card-head"><span>MEMORY</span><strong>{snapshot ? pct(memoryPercent) : "—"}</strong></div>
+            <SparkGraph values={memoryHistory} tall label="Memory history" />
+            <div class="perf-card-foot">
+              <span>{snapshot ? formatBytes(snapshot.usedMemory) : "—"} in use</span>
+              <span>{snapshot ? formatBytes(snapshot.totalMemory - snapshot.usedMemory) : "—"} available</span>
+            </div>
           </div>
         </div>
 
-        <div class="performance-secondary">
-          <div class="leader-card">
-            <div class="card-register"><span>LOAD LEADERS</span><small>CPU // LIVE</small></div>
-            <div class="leader-list">
-              {#each cpuLeaders.slice(0, 4) as process (process.pid)}
-                <div class="leader-row">
-                  <span><b>{process.name}</b><small>PID {process.pid}</small></span>
-                  <i style={`--leader:${Math.min(100, process.cpu)}%`}></i>
-                  <strong>{pct(process.cpu)}</strong>
-                </div>
-              {/each}
-            </div>
+        <div class="perf-leaders">
+          <div class="perf-leaders-head">
+            <button class:active={selectedMetric === "cpu"} onclick={() => selectedMetric = "cpu"}>TOP CPU</button>
+            <button class:active={selectedMetric === "memory"} onclick={() => selectedMetric = "memory"}>TOP MEMORY</button>
+            <span>select a row to inspect it in Processes</span>
           </div>
-          <div class="telemetry-card memory-card">
-            <div class="telemetry-head"><span>MEMORY COMPOSITION</span><strong>{snapshot ? pct(memoryPercent) : "—"}</strong></div>
-            <div class="memory-composition"><i style={`--used:${Math.min(100, memoryPercent)}%`}></i></div>
-            <div class="memory-breakdown">
-              <span><small>IN USE</small><b>{snapshot ? formatBytes(snapshot.usedMemory) : "—"}</b></span>
-              <span><small>AVAILABLE</small><b>{snapshot ? formatBytes(snapshot.totalMemory - snapshot.usedMemory) : "—"}</b></span>
-            </div>
-          </div>
-          <div class="telemetry-card telemetry-register">
-            <span>PROCESS FIELD</span>
-            <strong>{snapshot?.processCount ?? "—"}</strong>
-            <small>visible processes / 1 s acquisition</small>
+          <div class="perf-leaders-list">
+            {#each selectedMetric === "cpu" ? cpuLeaders : memoryLeaders as process (process.pid)}
+              <button class="perf-leader-row" onclick={() => openProcess(process.pid)}>
+                <span class="perf-leader-name"><b>{process.name}</b><small>PID {process.pid}</small></span>
+                <i style={`--leader:${Math.min(100, selectedMetric === "cpu" ? process.cpu : snapshot?.totalMemory ? (process.memory / snapshot.totalMemory) * 100 : 0)}%`}></i>
+                <strong>{selectedMetric === "cpu" ? pct(process.cpu) : formatBytes(process.memory)}</strong>
+              </button>
+            {/each}
           </div>
         </div>
       </section>
@@ -367,10 +370,10 @@
         </div>
 
         <div class="system-bottom-grid">
-          <div class="system-telemetry panel-ticks">
+          <div class="system-telemetry">
             <div class="system-telemetry-head">
               <div><span>LIVE TELEMETRY</span><strong>Resource state</strong></div>
-              <small>60 SECOND WINDOW // 1 S SAMPLE</small>
+              <small>{formatWindow(historySeconds)} WINDOW // {formatWindow(period.ms / 1000)} SAMPLE</small>
             </div>
             <div class="system-telemetry-grid">
               <div>
