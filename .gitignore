@@ -6,3 +6,5 @@ dist/
 .svelte-kit/
 .DS_Store
 *.log
+
+frontend/package.json.md5
