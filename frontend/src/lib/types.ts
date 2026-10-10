@@ -1,11 +1,252 @@
+
+export type Availability = Record<string, string>;
+
+export type Category = "apps" | "background" | "system";
+
+export type ProcessState =
+  | "running"
+  | "sleeping"
+  | "waiting"
+  | "stopped"
+  | "zombie"
+  | "idle"
+  | "dead"
+  | "unknown";
+
+export type EnergyBand = "none" | "very-low" | "low" | "moderate" | "high" | "very-high";
+
+export type MemoryKind = "private" | "pss" | "rss" | "mixed";
+
+export type WindowRef = {
+  id: string;
+  title: string;
+  appId: string;
+  workspace: string;
+  output: string;
+  focused: boolean;
+};
+
 export type ProcessInfo = {
   pid: number;
   parentPid: number | null;
+  startTime: number;
   name: string;
+  exe: string | null;
   command: string;
-  status: string;
+  cwd: string | null;
+  user: string;
+  uid: number;
+  state: ProcessState;
+  kernelThread: boolean;
+  unit: string | null;
+  cpu: number;
+  cpuUser: number;
+  cpuSystem: number;
+  memory: number;
+  memoryKind: MemoryKind;
+  rss: number;
+  rssAnon: number | null;
+  rssFile: number | null;
+  rssShmem: number | null;
+  swap: number | null;
+  virtual: number;
+  diskRead: number | null;
+  diskWrite: number | null;
+  diskReadTotal: number | null;
+  diskWriteTotal: number | null;
+  gpu: number | null;
+  gpuMemory: number | null;
+  gpuIndex: number | null;
+  connections: number | null;
+  energy: EnergyBand;
+  energyScore: number;
+  threads: number;
+  fds: number | null;
+  nice: number;
+  priority: number;
+  ctxSwitches: number | null;
+  oomScore: number | null;
+  lastCpu: number | null;
+  windows: WindowRef[];
+};
+
+export type ProcessGroup = {
+  key: string;
+  category: Category;
+  name: string;
+  subtitle: string;
+  iconKey: string | null;
+  unit: string | null;
+  leaderPid: number;
+  instances: number;
+  windows: WindowRef[];
+  state: ProcessState;
   cpu: number;
   memory: number;
+  memoryKind: MemoryKind;
+  diskRead: number | null;
+  diskWrite: number | null;
+  gpu: number | null;
+  gpuMemory: number | null;
+  connections: number | null;
+  energy: EnergyBand;
+  energyScore: number;
+  threads: number;
+  members: ProcessInfo[];
+};
+
+export type Pressure = {
+  some10: number;
+  some60: number;
+  some300: number;
+  full10: number | null;
+  full60: number | null;
+  full300: number | null;
+};
+
+export type CpuCore = {
+  index: number;
+  usage: number;
+  freqMhz: number | null;
+  kind: "performance" | "efficiency" | null;
+};
+
+export type CpuCache = { level: string; size: string };
+
+export type CpuInfo = {
+  usage: number;
+  user: number;
+  system: number;
+  iowait: number;
+  irq: number;
+  cores: CpuCore[];
+  freqMhz: number | null;
+  maxFreqMhz: number | null;
+  governor: string | null;
+  loadAvg: [number, number, number];
+  uptimeSeconds: number;
+  processes: number;
+  threads: number;
+  openFiles: number | null;
+  openFilesMax: number | null;
+  model: string;
+  sockets: number;
+  physicalCores: number;
+  logicalCpus: number;
+  virtualization: string | null;
+  caches: CpuCache[];
+  pressure: Pressure | null;
+};
+
+export type MemoryInfo = {
+  total: number;
+  used: number;
+  available: number;
+  free: number;
+  buffers: number;
+  cached: number;
+  shared: number;
+  dirty: number;
+  mapped: number;
+  committed: number;
+  commitLimit: number;
+  swapTotal: number;
+  swapUsed: number;
+  swapCached: number;
+  zswap: number | null;
+  pressure: Pressure | null;
+  limits: Availability;
+};
+
+export type DiskMount = {
+  path: string;
+  fs: string;
+  used: number;
+  total: number;
+  system: boolean;
+};
+
+export type DiskInfo = {
+  name: string;
+  model: string | null;
+  kind: "nvme" | "ssd" | "hdd" | "removable" | "virtual" | "unknown";
+  capacity: number;
+  readRate: number;
+  writeRate: number;
+  readIops: number;
+  writeIops: number;
+  activePercent: number;
+  responseMs: number | null;
+  readTotal: number;
+  writeTotal: number;
+  mounts: DiskMount[];
+};
+
+export type NetworkInfo = {
+  name: string;
+  kind: "wifi" | "ethernet" | "virtual" | "loopback" | "unknown";
+  state: string;
+  rxRate: number;
+  txRate: number;
+  rxTotal: number;
+  txTotal: number;
+  ipv4: string[];
+  ipv6: string[];
+  mac: string | null;
+  mtu: number | null;
+  speedMbps: number | null;
+  ssid: string | null;
+  signal: number | null;
+  frequencyMhz: number | null;
+  driver: string | null;
+};
+
+export type GpuInfo = {
+  index: number;
+  name: string;
+  vendor: "nvidia" | "amd" | "intel" | "unknown";
+  usage: number | null;
+  memoryUsage: number | null;
+  encoder: number | null;
+  decoder: number | null;
+  memoryUsed: number | null;
+  memoryTotal: number | null;
+  temperature: number | null;
+  power: number | null;
+  powerLimit: number | null;
+  clockMhz: number | null;
+  memoryClockMhz: number | null;
+  driver: string | null;
+  pstate: string | null;
+  limits: Availability;
+};
+
+export type EnergyInfo = {
+  source: "battery" | "ac" | "unknown";
+  batteryPercent: number | null;
+  batteryStatus: string | null;
+  batteryPower: number | null;
+  batteryEnergyNow: number | null;
+  batteryEnergyFull: number | null;
+  batteryEnergyDesign: number | null;
+  timeToEmptySeconds: number | null;
+  cycleCount: number | null;
+  packagePower: number | null;
+  limits: Availability;
+};
+
+export type ThermalSensor = {
+  id: string;
+  chip: string;
+  label: string;
+  temperature: number;
+  max: number | null;
+  critical: number | null;
+};
+
+export type ThermalInfo = {
+  hotspot: ThermalSensor | null;
+  sensors: ThermalSensor[];
 };
 
 export type SystemInfo = {
@@ -19,13 +260,44 @@ export type SystemInfo = {
 
 export type Snapshot = {
   timestampMs: number;
+  sampleMs: number;
   accent: string;
-  cpu: number;
-  totalMemory: number;
-  usedMemory: number;
-  totalSwap: number;
-  usedSwap: number;
+  windowsSource: "shell" | "none";
+  selfPid: number;
+  cpu: CpuInfo;
+  memory: MemoryInfo;
+  disks: DiskInfo[];
+  networks: NetworkInfo[];
+  gpus: GpuInfo[];
+  energy: EnergyInfo;
+  thermal: ThermalInfo;
   processCount: number;
-  processes: ProcessInfo[];
+  groups: ProcessGroup[];
   system: SystemInfo;
+  limits: Availability;
+};
+
+export type ProcessRef = { pid: number; startTime: number };
+export type EndProcessArgs = ProcessRef & { force: boolean };
+export type EndGroupArgs = { key: string; force: boolean };
+export type SignalProcessArgs = ProcessRef & { action: "suspend" | "resume" };
+export type SetPriorityArgs = ProcessRef & { nice: number };
+export type ProcessDetailArgs = ProcessRef;
+
+export type Series = (number | null)[];
+
+export type History = {
+  cpu: Series;
+  cpuUser: Series;
+  cpuSystem: Series;
+  cores: Series[];
+  memory: Series;
+  swap: Series;
+  disks: Record<string, { active: Series; read: Series; write: Series }>;
+  networks: Record<string, { rx: Series; tx: Series }>;
+  gpus: Record<number, { usage: Series; memory: Series; encoder: Series; decoder: Series }>;
+  batteryPower: Series;
+  thermals: Record<string, Series>;
+  selectedGroup: Series;
+  selectedProcess: Series;
 };

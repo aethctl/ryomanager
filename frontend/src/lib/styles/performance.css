@@ -1,0 +1,849 @@
+.performance-workspace-page {
+  max-width: 1440px;
+  overflow: hidden;
+}
+
+.performance-workspace-page .page-head {
+  flex: 0 0 auto;
+}
+.performance-workspace-page .section-label,
+.performance-workspace-page .section-label .section-mark {
+  font-size: 12px;
+}
+
+.performance-sample-meta {
+  min-width: 86px;
+  padding-left: 14px;
+  border-left: 1px solid var(--ryo-line);
+  display: grid;
+  gap: 4px;
+  color: var(--ryo-ink-faint);
+  font-family: var(--ryo-mono);
+  font-size: 12px;
+  letter-spacing: .12em;
+}
+
+.performance-sample-meta strong {
+  color: var(--ryo-ink-dim);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.performance-workspace {
+  min-height: 0;
+  flex: 1;
+  display: grid;
+  grid-template-columns: 224px minmax(0, 1fr);
+  border: 1px solid var(--ryo-line);
+  border-radius: var(--ryo-radius);
+  background: color-mix(in srgb, var(--ryo-panel-low) 92%, transparent);
+  overflow: hidden;
+}
+
+.performance-rail {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--ryo-line);
+  background: color-mix(in srgb, var(--ryo-rail) 94%, transparent);
+}
+
+.performance-rail-head,
+.performance-panel-head,
+.perf-graph-label,
+.composition-block > header,
+.swap-block > header,
+.mount-table > header,
+.sensor-table > header,
+.perf-drivers > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.performance-rail-head {
+  min-height: 39px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--ryo-line-soft);
+  color: var(--ryo-ink-muted);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.performance-rail-head small {
+  color: var(--ryo-ink-ghost);
+  font-family: var(--ryo-mono);
+  font-size: 12px;
+}
+
+.performance-rail-list {
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ryo-line-strong) transparent;
+}
+
+.performance-rail-list > button {
+  position: relative;
+  width: 100%;
+  min-height: 84px;
+  padding: 9px 10px 8px 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-rows: auto 28px;
+  gap: 7px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--ryo-line-soft);
+  background: transparent;
+  color: var(--ryo-ink-muted);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--ryo-snap), color var(--ryo-snap);
+}
+
+.performance-rail-list > button::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: transparent;
+}
+
+.performance-rail-list > button:hover {
+  background: var(--ryo-tint5);
+  color: var(--ryo-ink);
+}
+
+.performance-rail-list > button.active {
+  background: color-mix(in srgb, var(--ryo-signal) 9%, var(--ryo-panel-low));
+  color: var(--ryo-ink);
+}
+
+.performance-rail-list > button.active::before {
+  background: var(--ryo-signal);
+}
+
+.performance-rail-list > button:focus-visible,
+.perf-driver-row:focus-visible,
+.perf-toolbar button:focus-visible {
+  outline: 1px solid var(--ryo-signal);
+  outline-offset: -2px;
+}
+
+.rail-copy {
+  min-width: 0;
+  align-self: center;
+}
+
+.rail-copy b,
+.rail-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-copy b {
+  font-size: 14px;
+  font-weight: 550;
+}
+
+.rail-copy small {
+  margin-top: 2px;
+  color: var(--ryo-ink-ghost);
+  font-family: var(--ryo-mono);
+  font-size: 12px;
+}
+
+.rail-mini {
+  grid-column: 1 / -1;
+  min-width: 0;
+  opacity: .8;
+}
+
+.rail-mini .graph {
+  height: 28px !important;
+}
+
+.performance-rail-list > button > strong {
+  align-self: center;
+  color: var(--ryo-ink-dim);
+  font-family: var(--ryo-mono);
+  font-size: 15px;
+  font-weight: 500;
+  text-align: right;
+}
+
+.performance-detail {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ryo-line-strong) transparent;
+}
+
+.performance-panel {
+  min-width: 0;
+  padding: 20px 22px 26px;
+}
+
+.performance-panel-head {
+  min-height: 68px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--ryo-line-soft);
+}
+
+.performance-panel-head > div {
+  min-width: 0;
+}
+
+.performance-panel-head span {
+  color: var(--ryo-ink-faint);
+  font-family: var(--ryo-mono);
+  font-size: 12px;
+  letter-spacing: .12em;
+}
+
+.performance-panel-head h2 {
+  margin-top: 3px;
+  font-size: 30px;
+}
+
+.performance-panel-head p {
+  max-width: 640px;
+  margin: 4px 0 0;
+  overflow: hidden;
+  color: var(--ryo-ink-muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.performance-panel-head > strong {
+  flex: 0 0 auto;
+  color: var(--ryo-ink);
+  font-family: var(--ryo-mono);
+  font-size: 27px;
+  font-weight: 450;
+  letter-spacing: -.04em;
+}
+
+.metric-missing {
+  cursor: help;
+}
+
+.perf-toolbar {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.perf-segmented {
+  padding: 2px;
+  display: inline-flex;
+  border: 1px solid var(--ryo-line-soft);
+  border-radius: 4px;
+  background: var(--ryo-paper-lift);
+}
+
+.perf-segmented button {
+  min-height: 25px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ryo-ink-faint);
+  font-family: var(--ryo-mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.perf-segmented button.active {
+  background: var(--ryo-tint10);
+  color: var(--ryo-ink);
+}
+
+.perf-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ryo-ink-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.perf-check input {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: var(--ryo-signal);
+}
+
+.perf-graph-block {
+  min-width: 0;
+  padding: 13px 14px 10px;
+  border: 1px solid var(--ryo-line);
+  border-radius: var(--ryo-radius);
+  background: color-mix(in srgb, var(--ryo-panel) 88%, transparent);
+}
+
+.perf-graph-primary {
+  margin-top: 12px;
+}
+
+.perf-graph-secondary {
+  margin-top: 10px;
+}
+
+.perf-graph-label span,
+.composition-block > header span,
+.swap-block > header span,
+.mount-table > header span,
+.sensor-table > header span,
+.perf-drivers > header span {
+  color: var(--ryo-ink-muted);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.perf-graph-label small,
+.composition-block > header small,
+.swap-block > header small,
+.mount-table > header small,
+.sensor-table > header small,
+.perf-drivers > header small {
+  color: var(--ryo-ink-ghost);
+  font-family: var(--ryo-mono);
+  font-size: 12px;
+}
+
+.perf-graph-primary .graph {
+  height: 210px !important;
+  margin-top: 10px;
+}
+
+.perf-graph-secondary .graph {
+  height: 78px !important;
+  margin-top: 8px;
+}
+
+.perf-legend {
+  margin-top: 7px;
+  display: flex;
+  justify-content: end;
+  gap: 14px;
+  color: var(--ryo-ink-faint);
+  font-family: var(--ryo-mono);
+  font-size: 12px;
+}
+
+.perf-legend span::before {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 2px;
+  margin-right: 5px;
+  vertical-align: middle;
+  background: var(--ryo-signal);
+}
+
+.perf-legend span.secondary::before {
+  opacity: .5;
+  background: repeating-linear-gradient(90deg, var(--ryo-signal) 0 3px, transparent 3px 5px);
+}
+
+.performance-dual-graphs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.core-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: 7px;
+}
+
+.core-grid > div {
+  min-width: 0;
+  padding: 9px 10px 8px;
+  border: 1px solid var(--ryo-line-soft);
+  border-radius: 4px;
+  background: var(--ryo-panel-low);
+}
+
+.core-grid > div.performance-core {
+  border-color: color-mix(in srgb, var(--ryo-signal) 38%, var(--ryo-line-soft));
+  background: color-mix(in srgb, var(--ryo-signal) 10%, var(--ryo-panel-low));
+}
+
+.core-grid > div.efficiency-core {
+  border-color: color-mix(in srgb, var(--ryo-signal) 18%, var(--ryo-line-soft));
+  background: color-mix(in srgb, var(--ryo-signal) 4%, var(--ryo-panel-low));
+}
+
+.core-grid header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--ryo-ink-muted);
+  font-family: var(--ryo-mono);
+  font-size: 12px;
+}
+
+.core-grid header b {
+  color: var(--ryo-ink-dim);
+  font-weight: 500;
+}
+
+.core-grid .graph {
+  height: 50px !important;
+  margin-top: 7px;
+}
+
+.core-grid > div > small {
+  display: block;
+  margin-top: 5px;
+  color: var(--ryo-ink-ghost);
+  font-family: var(--ryo-mono);
+  font-size: 12px;
+}
+
+.perf-detail-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--ryo-line);
+  border-radius: var(--ryo-radius);
+  background: color-mix(in srgb, var(--ryo-panel) 76%, transparent);
+  overflow: hidden;
+}
+
+.perf-detail-grid > div {
+  position: relative;
+  min-width: 0;
+  min-height: 54px;
+  padding: 10px 13px;
+  border-right: 1px solid var(--ryo-line-soft);
+  border-bottom: 1px solid var(--ryo-line-soft);
+}
+
+.perf-detail-grid > div:nth-child(even) {
+  border-right: 0;
+}
+
+.perf-detail-grid > div.wide {
+  grid-column: 1 / -1;
+  border-right: 0;
+}
+
+.perf-detail-grid > div > span {
+  display: block;
+  color: var(--ryo-ink-faint);
+  font-family: var(--ryo-mono);
+  font-size: 12px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.perf-detail-grid > div > strong {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 7px;
+  margin-top: 6px;
+  color: var(--ryo-ink-dim);
+  font-family: var(--ryo-mono);
+  font-size: 15px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.perf-detail-grid > div > strong b {
+  min-width: 0;
+  max-width: 100%;
+  font-size: 15px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.perf-detail-grid > div > strong small {
+  color: var(--ryo-ink-ghost);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.perf-detail-grid .detail-note {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--ryo-ink-ghost);
+  font-family: var(--ryo-mono);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composition-block,
+.swap-block,
+.mount-table,
+.sensor-table,
+.perf-drivers,
+.access-note {
+  margin-top: 12px;
+  border: 1px solid var(--ryo-line);
+  border-radius: var(--ryo-radius);
+  background: color-mix(in srgb, var(--ryo-panel) 78%, transparent);
+}
+
+.composition-block,
+.swap-block {
+  padding: 12px 14px;
+}
+
+.composition-bar,
+.meter {
+  height: 9px;
+  margin-top: 10px;
+  display: flex;
+  border: 1px solid var(--ryo-line-soft);
+  background: var(--ryo-paper);
+  overflow: hidden;
+}
+
+.composition-bar > i,
+.meter > i {
+  display: block;
+  min-width: 0;
+  height: 100%;
+}
+
+.composition-bar .memory-used,
+.meter > i {
+  background: var(--ryo-signal);
+}
+
+.composition-bar .memory-cache {
+  background: color-mix(in srgb, var(--ryo-signal) 48%, transparent);
+}
+
+.composition-bar .memory-free {
+  background: color-mix(in srgb, var(--ryo-signal) 15%, transparent);
+}
+
+.composition-legend {
+  margin-top: 9px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.composition-legend span {
+  color: var(--ryo-ink-faint);
+  font-size: 12px;
+}
+
+.composition-legend span > i {
+  width: 7px;
+  height: 7px;
+  margin-right: 5px;
+  display: inline-block;
+  border: 1px solid var(--ryo-line-soft);
+  vertical-align: middle;
+}
+
+.composition-legend i.memory-used { background: var(--ryo-signal); }
+.composition-legend i.memory-cache { background: color-mix(in srgb, var(--ryo-signal) 48%, transparent); }
+.composition-legend i.memory-free { background: color-mix(in srgb, var(--ryo-signal) 15%, transparent); }
+
+.composition-legend b {
+  display: block;
+  margin: 3px 0 0 12px;
+  color: var(--ryo-ink-dim);
+  font-family: var(--ryo-mono);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.swap-block .graph {
+  height: 42px !important;
+  margin-top: 8px;
+}
+
+.perf-limit-note {
+  margin: 10px 1px 0;
+  color: var(--ryo-ink-ghost);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.access-note {
+  padding: 12px 14px;
+  border-color: color-mix(in srgb, var(--ryo-signal) 24%, var(--ryo-line));
+}
+
+.access-note span {
+  color: var(--ryo-ink-dim);
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.access-note p {
+  margin: 5px 0 0;
+  color: var(--ryo-ink-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mount-table,
+.sensor-table,
+.perf-drivers {
+  overflow: hidden;
+}
+
+.mount-table > header,
+.sensor-table > header,
+.perf-drivers > header {
+  min-height: 39px;
+  padding: 0 13px;
+  border-bottom: 1px solid var(--ryo-line-soft);
+  background: var(--ryo-paper-lift);
+}
+
+.mount-table-head,
+.mount-row,
+.sensor-table-head,
+.sensor-row {
+  display: grid;
+  align-items: center;
+  gap: 12px;
+}
+
+.mount-table-head,
+.mount-row {
+  grid-template-columns: minmax(120px, 1.4fr) minmax(80px, .8fr) 90px 90px;
+}
+
+.sensor-table-head,
+.sensor-row {
+  grid-template-columns: minmax(140px, 1.4fr) repeat(3, minmax(80px, .6fr));
+}
+
+.mount-table-head,
+.sensor-table-head {
+  min-height: 29px;
+  padding: 0 13px;
+  border-bottom: 1px solid var(--ryo-line-soft);
+  color: var(--ryo-ink-ghost);
+  font-family: var(--ryo-mono);
+  font-size: 12px;
+}
+
+.mount-row,
+.sensor-row {
+  min-height: 43px;
+  padding: 6px 13px;
+  border-bottom: 1px solid var(--ryo-line-soft);
+  color: var(--ryo-ink-muted);
+  font-family: var(--ryo-mono);
+  font-size: 12px;
+}
+
+.mount-row:last-child,
+.sensor-row:last-child {
+  border-bottom: 0;
+}
+
+.mount-row strong,
+.sensor-row strong,
+.sensor-row b {
+  overflow: hidden;
+  color: var(--ryo-ink-dim);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sensor-row > span,
+.sensor-row > span b,
+.sensor-row > span small {
+  min-width: 0;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sensor-row > span small {
+  margin-top: 2px;
+  color: var(--ryo-ink-ghost);
+  font-size: 12px;
+}
+
+.perf-drivers > header > div {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.perf-drivers > header > b {
+  color: var(--ryo-ink-ghost);
+  font-family: var(--ryo-mono);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.perf-driver-row {
+  width: 100%;
+  min-height: 46px;
+  padding: 7px 13px;
+  display: grid;
+  grid-template-columns: 22px minmax(150px, 1fr) minmax(70px, .65fr) 78px;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-bottom: 1px solid var(--ryo-line-soft);
+  background: transparent;
+  color: var(--ryo-ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--ryo-snap);
+}
+
+.perf-driver-row:last-child {
+  border-bottom: 0;
+}
+
+.perf-driver-row:hover {
+  background: var(--ryo-tint5);
+}
+
+.driver-rank {
+  color: var(--ryo-ink-ghost);
+  font-family: var(--ryo-mono);
+  font-size: 12px;
+}
+
+.perf-driver-name {
+  min-width: 0;
+}
+
+.perf-driver-name b,
+.perf-driver-name small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.perf-driver-name b {
+  font-size: 14px;
+  font-weight: 550;
+}
+
+.perf-driver-name small {
+  margin-top: 2px;
+  color: var(--ryo-ink-ghost);
+  font-family: var(--ryo-mono);
+  font-size: 12px;
+}
+
+.perf-driver-row > i {
+  position: relative;
+  height: 3px;
+  background: var(--ryo-line-soft);
+  overflow: hidden;
+}
+
+.perf-driver-row > i::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--leader);
+  background: var(--ryo-signal);
+}
+
+.perf-driver-row > strong {
+  color: var(--ryo-ink-dim);
+  font-family: var(--ryo-mono);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: right;
+}
+
+.perf-driver-empty,
+.perf-empty {
+  margin: 0;
+  padding: 16px 13px;
+  color: var(--ryo-ink-ghost);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 1080px) {
+  .performance-workspace {
+    grid-template-columns: 194px minmax(0, 1fr);
+  }
+
+  .performance-panel {
+    padding-right: 17px;
+    padding-left: 17px;
+  }
+
+  .performance-dual-graphs,
+  .composition-legend {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 820px) {
+  .performance-workspace-page {
+    overflow: auto;
+  }
+
+  .performance-workspace {
+    min-height: auto;
+    display: block;
+    overflow: visible;
+  }
+
+  .performance-rail {
+    max-height: 220px;
+    border-right: 0;
+    border-bottom: 1px solid var(--ryo-line);
+  }
+
+  .performance-rail-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .performance-detail {
+    overflow: visible;
+  }
+
+  .perf-detail-grid,
+  .performance-dual-graphs {
+    grid-template-columns: 1fr;
+  }
+
+  .perf-detail-grid > div,
+  .perf-detail-grid > div:nth-child(even) {
+    border-right: 0;
+  }
+
+  .perf-driver-row {
+    grid-template-columns: 20px minmax(120px, 1fr) 64px;
+  }
+
+  .perf-driver-row > i {
+    display: none;
+  }
+}
