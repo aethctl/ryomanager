@@ -1,12 +1,8 @@
 # RyoManager
 
-# RyoManager
-
 <p align="center">
   <img src="readme/assets/2026_10_10_18_59_07_screenshot.png" width="100%" />
 </p>
-
-## Screenshots
 
 <p align="center">
   <img src="readme/assets/2026_10_10_19_00_33_screenshot.png" width="49%" />
