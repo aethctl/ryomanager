@@ -509,7 +509,6 @@ h2 { margin-top: 3px; font-size: 31px; }
   * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
 
-/* --- Ryoku density pass -------------------------------------------------- */
 
 .page {
   padding: 22px 26px 20px;
@@ -786,7 +785,6 @@ h2 { margin-top: 3px; font-size: 31px; }
   }
 }
 
-/* --- Flagship dashboard pass ------------------------------------------- */
 
 .top-runtime {
   max-width: 220px;
@@ -1160,7 +1158,6 @@ h2 { margin-top: 3px; font-size: 31px; }
 }
 
 
-/* --- Ryotunes alignment pass ------------------------------------------- */
 
 :root {
   --ryo-system-accent: #e2342a;
