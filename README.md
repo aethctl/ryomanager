@@ -23,25 +23,32 @@ Startup applications, services, process grouping, GPU, disk, network and deeper 
 
 ## Development
 
-RyoManager uses Tauri 2, Rust, Svelte 5 and Vite.
+RyoManager uses Wails 2, Go, Svelte 5 and Vite. The frontend lives in `frontend/`; the native Linux collector and process controls are implemented in Go.
 
 ```sh
 nix develop
-npm install
-npm run tauri -- dev
+wails dev
 ```
 
 Frontend checks:
 
 ```sh
+cd frontend
+npm ci
 npm run check
 npm run build
 ```
 
-Rust backend check:
+Go backend check:
 
 ```sh
-nix develop -c cargo check --manifest-path src-tauri/Cargo.toml
+go test ./...
+```
+
+Production build:
+
+```sh
+wails build
 ```
 
 ## Design principles

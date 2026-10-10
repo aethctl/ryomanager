@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api/core";
+  import { Snapshot as GetSnapshot, EndProcess } from "../wailsjs/go/main/App";
   import SparkGraph from "./lib/components/SparkGraph.svelte";
   import type { Snapshot } from "./lib/types";
 
@@ -36,7 +36,7 @@
 
   async function refresh() {
     try {
-      const next = await invoke<Snapshot>("snapshot");
+      const next = await GetSnapshot() as Snapshot;
       snapshot = next;
       cpuHistory = [...cpuHistory, next.cpu].slice(-historyLimit);
       const memoryPct = next.totalMemory > 0 ? (next.usedMemory / next.totalMemory) * 100 : 0;
@@ -51,7 +51,7 @@
     if (selectedPid === null || busy) return;
     busy = true;
     try {
-      await invoke("end_process", { pid: selectedPid, force });
+      await EndProcess(selectedPid, force);
       selectedPid = null;
       await refresh();
     } catch (cause) {
