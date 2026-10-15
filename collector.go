@@ -66,6 +66,8 @@ func (c *Collector) Snapshot() Snapshot {
 	energy := readEnergy()
 	thermal := readThermals()
 	groups, iconMap := groupProcesses(processes)
+	windows, windowsSource := readWindows()
+	attachWindows(groups, windows)
 	c.groups = map[string][][2]uint64{}
 	c.processes = map[[2]uint64]ProcessInfo{}
 	for _, g := range groups {
@@ -89,7 +91,7 @@ func (c *Collector) Snapshot() Snapshot {
 		"ctxSwitches":          "exact memory and counters are read for the inspected process",
 		"oomScore":             "exact memory and counters are read for the inspected process",
 	}
-	return Snapshot{TimestampMS: now.UnixMilli(), SampleMS: sampleMS, Accent: ryokuAccent(), WindowsSource: "none", SelfPID: os.Getpid(), CPU: cpu, Memory: memory, Disks: disks, Networks: networks, GPUs: gpus, Energy: energy, Thermal: thermal, ProcessCount: len(processes), Groups: groups, System: readSystemInfo(cpu), Limits: limits}
+	return Snapshot{TimestampMS: now.UnixMilli(), SampleMS: sampleMS, Accent: ryokuAccent(), WindowsSource: windowsSource, SelfPID: os.Getpid(), CPU: cpu, Memory: memory, Disks: disks, Networks: networks, GPUs: gpus, Energy: energy, Thermal: thermal, ProcessCount: len(processes), Groups: groups, System: readSystemInfo(cpu), Limits: limits}
 }
 
 func (c *Collector) Process(pid int, start uint64) (ProcessInfo, bool) {
