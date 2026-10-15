@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/user"
@@ -906,7 +907,189 @@ func wifiInfo(name string) (string, *float64, *float64) {
 	}
 	return ssid, sig, freq
 }
+
 func readGPUs() []GpuInfo {
+	out := readNvidiaGPUs()
+	for _, gpu := range readDrmGPUs() {
+		gpu.Index = uint32(len(out))
+		out = append(out, gpu)
+	}
+	return out
+}
+
+func readDrmGPUs() []GpuInfo { return readDrmGPUsIn("/sys/class/drm") }
+
+func readDrmGPUsIn(root string) []GpuInfo {
+	cards, _ := filepath.Glob(filepath.Join(root, "card[0-9]"))
+	more, _ := filepath.Glob(filepath.Join(root, "card[0-9][0-9]"))
+	cards = append(cards, more...)
+	sort.Strings(cards)
+
+	var out []GpuInfo
+	for _, card := range cards {
+		dev := filepath.Join(card, "device")
+		vendor := strings.ToLower(strings.TrimSpace(readString(filepath.Join(dev, "vendor"))))
+		var name, brand, driver string
+		switch vendor {
+		case "0x1002":
+			name, brand, driver = "AMD graphics", "amd", "amdgpu"
+		case "0x8086":
+			name, brand, driver = "Intel graphics", "intel", "i915"
+		default:
+			continue
+		}
+
+		if link, err := os.Readlink(filepath.Join(dev, "driver")); err == nil {
+			driver = filepath.Base(link)
+		}
+		gpu := GpuInfo{
+			Name:   name,
+			Vendor: brand,
+			Driver: strp(driver),
+			Limits: Availability{},
+		}
+		if label := readString(filepath.Join(dev, "product_name")); label != "" {
+			gpu.Name = label
+		} else if label := pciDeviceName(vendor, readString(filepath.Join(dev, "device"))); label != "" {
+			gpu.Name = label
+		}
+		if busy := readString(filepath.Join(dev, "gpu_busy_percent")); busy != "" {
+			gpu.Usage = parseF64Ptr(busy)
+		} else {
+			gpu.Limits["gpuUsage"] = "this driver publishes no utilisation figure"
+		}
+
+		used := readUint(filepath.Join(dev, "mem_info_vram_used"))
+		total := readUint(filepath.Join(dev, "mem_info_vram_total"))
+		if total > 0 {
+			gpu.MemoryUsed = u64ptrIf(used)
+			gpu.MemoryTotal = u64ptrIf(total)
+			gpu.MemoryUsage = f64ptrIf(float64(used) / float64(total) * 100)
+		} else {
+			gpu.Limits["gpuMemory"] = "this card shares system memory"
+		}
+
+		readDrmHwmon(dev, &gpu)
+
+		if line := markedClock(filepath.Join(dev, "pp_dpm_sclk")); line > 0 {
+			gpu.ClockMhz = f64ptrIf(line)
+		}
+		if line := markedClock(filepath.Join(dev, "pp_dpm_mclk")); line > 0 {
+			gpu.MemoryClockMhz = f64ptrIf(line)
+		}
+		gpu.Pstate = readStringPtr(filepath.Join(dev, "power_dpm_force_performance_level"))
+
+		out = append(out, gpu)
+	}
+	return out
+}
+
+func pciDeviceName(vendor, device string) string {
+	vendor, device = trimHex(vendor), trimHex(device)
+	if vendor == "" || device == "" {
+		return ""
+	}
+	key := vendor + ":" + device
+	pciNamesMu.Lock()
+	defer pciNamesMu.Unlock()
+	if name, ok := pciNames[key]; ok {
+		return name
+	}
+	name := lookUpPCIName(vendor, device)
+	pciNames[key] = name
+	return name
+}
+
+var (
+	pciNamesMu sync.Mutex
+	pciNames   = map[string]string{}
+)
+
+func lookUpPCIName(vendor, device string) string {
+	for _, path := range []string{"/usr/share/hwdata/pci.ids", "/usr/share/misc/pci.ids", "/usr/share/pci.ids"} {
+		f, err := os.Open(path)
+		if err != nil {
+			continue
+		}
+		name := scanPCIIDs(f, vendor, device)
+		f.Close()
+		if name != "" {
+			return name
+		}
+	}
+	return ""
+}
+
+func scanPCIIDs(r io.Reader, vendor, device string) string {
+	scanner := bufio.NewScanner(r)
+	inVendor := false
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		switch {
+		case !strings.HasPrefix(line, "\t"):
+			if inVendor {
+				return ""
+			}
+			inVendor = strings.HasPrefix(line, vendor+" ")
+		case inVendor && strings.HasPrefix(line, "\t"+device+" "):
+			name := strings.TrimSpace(strings.TrimPrefix(line, "\t"+device))
+			if open := strings.LastIndex(name, "["); open >= 0 && strings.HasSuffix(name, "]") {
+				name = name[open+1 : len(name)-1]
+			}
+			return name
+		}
+	}
+	return ""
+}
+
+func trimHex(s string) string {
+	return strings.ToLower(strings.TrimPrefix(strings.TrimSpace(s), "0x"))
+}
+
+func readDrmHwmon(dev string, gpu *GpuInfo) {
+	dirs, _ := filepath.Glob(filepath.Join(dev, "hwmon", "hwmon*"))
+	if len(dirs) == 0 {
+		gpu.Limits["gpuTemperature"] = "this card reports no sensors"
+		return
+	}
+	h := dirs[0]
+	if milli := readInt(filepath.Join(h, "temp1_input")); milli > 0 {
+		gpu.Temperature = f64ptrIf(float64(milli) / 1000)
+	}
+	micro := readUint(filepath.Join(h, "power1_average"))
+	if micro == 0 {
+		micro = readUint(filepath.Join(h, "power1_input"))
+	}
+	if micro > 0 {
+		gpu.Power = f64ptrIf(float64(micro) / 1e6)
+	}
+	if limit := readUint(filepath.Join(h, "power1_cap")); limit > 0 {
+		gpu.PowerLimit = f64ptrIf(float64(limit) / 1e6)
+	}
+}
+
+func markedClock(path string) float64 {
+	for _, line := range strings.Split(readString(path), "\n") {
+		if !strings.HasSuffix(strings.TrimSpace(line), "*") {
+			continue
+		}
+		for _, field := range strings.Fields(line) {
+			lower := strings.ToLower(field)
+			if !strings.HasSuffix(lower, "mhz") {
+				continue
+			}
+			if v, err := strconv.ParseFloat(strings.TrimSuffix(lower, "mhz"), 64); err == nil {
+				return v
+			}
+		}
+	}
+	return 0
+}
+
+func readNvidiaGPUs() []GpuInfo {
 	cmd := exec.Command("nvidia-smi", "--query-gpu=index,name,utilization.gpu,utilization.memory,memory.used,memory.total,temperature.gpu,power.draw,power.limit,clocks.gr,clocks.mem,driver_version,pstate", "--format=csv,noheader,nounits")
 	b, err := cmd.Output()
 	if err != nil {
