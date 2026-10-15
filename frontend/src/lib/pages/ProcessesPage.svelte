@@ -160,7 +160,7 @@
       case "threads": return group.threads;
       case "user": return root?.user ?? "";
       case "nice": return root?.nice ?? 0;
-      case "started": return root?.startTime ?? 0;
+      case "started": return root?.startedAt ?? 0;
       case "unit": return group.unit ?? "";
       case "connections": return group.connections ?? -1;
       case "swap": return sumMeasured(group.members.map((member) => member.swap)) ?? -1;
@@ -183,7 +183,7 @@
       case "threads": return member.threads;
       case "user": return member.user;
       case "nice": return member.nice;
-      case "started": return member.startTime;
+      case "started": return member.startedAt;
       case "unit": return member.unit ?? "";
       case "connections": return member.connections ?? -1;
       case "swap": return member.swap ?? -1;
@@ -392,7 +392,7 @@
         case "threads": return member.threads;
         case "user": return member.user;
         case "nice": return member.nice;
-        case "started": return member.startTime;
+        case "started": return member.startedAt || null;
         case "unit": return member.unit;
         case "connections": return member.connections;
         case "swap": return member.swap;
@@ -412,7 +412,7 @@
       case "threads": return group.threads;
       case "user": return root?.user ?? null;
       case "nice": return root?.nice ?? null;
-      case "started": return root?.startTime ?? null;
+      case "started": return root?.startedAt || null;
       case "unit": return group.unit;
       case "connections": return group.connections;
       case "swap": return sumMeasured(group.members.map((item) => item.swap));
@@ -792,8 +792,8 @@
 
           <div class="inspector-registry identity-registry">
             <div><span>USER</span><strong>{inspectedProcess.user}</strong></div>
-            <div><span>STARTED</span><strong>{new Date(inspectedProcess.startTime * 1000).toLocaleString()}</strong></div>
-            <div><span>UPTIME</span><strong>{formatUptime(inspectedProcess.startTime)}</strong></div>
+            <div><span>STARTED</span><strong>{inspectedProcess.startedAt ? new Date(inspectedProcess.startedAt * 1000).toLocaleString() : "—"}</strong></div>
+            <div><span>UPTIME</span><strong>{inspectedProcess.startedAt ? formatUptime(inspectedProcess.startedAt) : "—"}</strong></div>
             <div><span>UNIT</span><strong title={inspectedProcess.unit ?? "No systemd unit"}>{inspectedProcess.unit ?? "—"}</strong></div>
             <div class="wide"><span>EXECUTABLE</span><code>{inspectedProcess.exe ?? "—"}</code></div>
             <div class="wide"><span>WORKING DIRECTORY</span><code>{inspectedProcess.cwd ?? "—"}</code></div>
