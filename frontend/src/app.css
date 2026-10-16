@@ -492,6 +492,7 @@ h2 { margin-top: 3px; font-size: 27px; }
   min-height: 0;
   flex: 1;
   overflow: auto;
+  scrollbar-gutter: stable;
   scroll-padding-top: calc(var(--process-table-header-height) + var(--process-section-header-height));
   scrollbar-width: thin;
   scrollbar-color: var(--ryo-line-strong) transparent;
