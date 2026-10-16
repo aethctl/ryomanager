@@ -656,14 +656,26 @@ h2 { margin-top: 3px; font-size: 27px; }
   display: grid;
   place-items: center;
   overflow: hidden;
-  border: 1px solid var(--ryo-line);
+  padding: 3px;
+  border: 1px solid var(--ryo-line-soft);
   border-radius: 5px;
-  background: var(--ryo-key);
+  background: color-mix(in srgb, var(--ryo-key) 72%, transparent);
   color: var(--ryo-ink-muted);
   font-family: var(--ryo-mono);
 }
-.process-icon.large { width: 42px; height: 42px; border-radius: var(--ryo-radius); }
-.process-icon img { width: 100%; height: 100%; object-fit: contain; }
+.process-icon.large {
+  width: 42px;
+  height: 42px;
+  padding: 5px;
+  border-radius: var(--ryo-radius);
+}
+.process-icon img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  border-radius: 3px;
+}
 .process-icon .initials { font-size: 8px; font-weight: 600; letter-spacing: .02em; }
 .process-icon.large .initials { font-size: 11px; }
 .process-icon .unit-mark {
