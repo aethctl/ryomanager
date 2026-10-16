@@ -30,6 +30,7 @@ export type ProcessInfo = {
   pid: number;
   parentPid: number | null;
   startTime: number;
+  startedAt: number;
   name: string;
   exe: string | null;
   command: string;

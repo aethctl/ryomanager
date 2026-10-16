@@ -374,6 +374,52 @@ func readProcStatus(pid int) procStatus {
 	return s
 }
 
+const userHz = 100
+
+func startedAt(ticks uint64) uint64 {
+	boot := bootTime()
+	if boot == 0 {
+		return 0
+	}
+	return boot + ticks/userHz
+}
+
+var (
+	bootMu   sync.Mutex
+	bootSec  uint64
+	bootRead bool
+	bootAt   time.Time
+)
+
+const bootTimeTTL = 30 * time.Second
+
+func bootTime() uint64 {
+	bootMu.Lock()
+	defer bootMu.Unlock()
+	if !bootRead || time.Since(bootAt) > bootTimeTTL {
+		bootAt = time.Now()
+		bootSec = readBootTime()
+		bootRead = true
+	}
+	return bootSec
+}
+
+func readBootTime() uint64 {
+	f, err := os.Open("/proc/stat")
+	if err != nil {
+		return 0
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		if after, found := strings.CutPrefix(scanner.Text(), "btime "); found {
+			v, _ := strconv.ParseUint(strings.TrimSpace(after), 10, 64)
+			return v
+		}
+	}
+	return 0
+}
+
 func parseProcess(pid int, raw string) (ProcessInfo, procRaw, bool) {
 	open := strings.IndexByte(raw, '(')
 	close := strings.LastIndex(raw, ") ")
@@ -394,7 +440,7 @@ func parseProcess(pid int, raw string) (ProcessInfo, procRaw, bool) {
 	start, _ := strconv.ParseUint(f[19], 10, 64)
 	virt, _ := strconv.ParseUint(f[20], 10, 64)
 	procCPU, _ := strconv.ParseUint(f[36], 10, 32)
-	p := ProcessInfo{PID: pid, ParentPID: &ppid, StartTime: start, Name: name, State: stateName(f[0]), Virtual: virt, Priority: pri, Nice: nice, Threads: threads, LastCPU: u32p(uint32(procCPU)), MemoryKind: "private", Energy: "none", Windows: []WindowRef{}}
+	p := ProcessInfo{PID: pid, ParentPID: &ppid, StartTime: start, StartedAt: startedAt(start), Name: name, State: stateName(f[0]), Virtual: virt, Priority: pri, Nice: nice, Threads: threads, LastCPU: u32p(uint32(procCPU)), MemoryKind: "private", Energy: "none", Windows: []WindowRef{}}
 	return p, procRaw{ticks: ut + st, utime: ut, stime: st}, true
 }
 

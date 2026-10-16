@@ -15,6 +15,7 @@ type ProcessInfo struct {
 	PID            int         `json:"pid"`
 	ParentPID      *int        `json:"parentPid"`
 	StartTime      uint64      `json:"startTime"`
+	StartedAt      uint64      `json:"startedAt"`
 	Name           string      `json:"name"`
 	Exe            *string     `json:"exe"`
 	Command        string      `json:"command"`
