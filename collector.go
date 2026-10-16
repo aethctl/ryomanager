@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -234,29 +235,33 @@ func buildCPUInfo(now cpuRaw, cores []cpuRaw, prev cpuRaw, prevCores []cpuRaw, p
 	return CpuInfo{Usage: usage, User: userP, System: systemP, IOWait: iowaitP, IRQ: irqP, Cores: coreInfo, FreqMhz: avgFreqP, MaxFreqMhz: maxFreq, Governor: gov, LoadAvg: load, UptimeSeconds: uptime, Processes: uint64(len(processes)), Threads: threads, OpenFiles: open, OpenFilesMax: max, Model: readCPUModel(), Sockets: uint64(socketCount()), PhysicalCores: uint64(physicalCoreCount()), LogicalCPUs: uint64(runtime.NumCPU()), Virtualization: readVirtualization(), Caches: readCaches(), Pressure: readPressure("/proc/pressure/cpu")}
 }
 func readProcesses(prev map[int]procRaw, deltaTotal uint64, sampleMS float64, sampled bool) ([]ProcessInfo, map[int]procRaw) {
-	entries, err := os.ReadDir("/proc")
+	dir, err := os.Open("/proc")
+	if err != nil {
+		return nil, map[int]procRaw{}
+	}
+	entries, err := dir.Readdirnames(-1)
+	dir.Close()
 	if err != nil {
 		return nil, map[int]procRaw{}
 	}
 	out := make([]ProcessInfo, 0, len(entries))
 	current := map[int]procRaw{}
+	reader := &procReader{}
 	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		pid, err := strconv.Atoi(e.Name())
+		pid, err := strconv.Atoi(e)
 		if err != nil {
 			continue
 		}
-		raw, err := os.ReadFile(filepath.Join("/proc", e.Name(), "stat"))
-		if err != nil {
-			continue
-		}
-		p, pr, ok := parseProcess(pid, string(raw))
+		rawBytes, ok := reader.file(pid, "stat")
 		if !ok {
 			continue
 		}
-		status := readProcStatus(pid)
+		raw := string(rawBytes)
+		p, pr, ok := parseProcess(pid, raw)
+		if !ok {
+			continue
+		}
+		status := reader.status(pid)
 		p.UID = status.uid
 		p.User = userName(status.uid)
 		p.RSS = status.rss
@@ -271,9 +276,9 @@ func readProcesses(prev map[int]procRaw, deltaTotal uint64, sampleMS float64, sa
 		p.OOMScore = nil
 		p.Exe = readLinkPtr(fmt.Sprintf("/proc/%d/exe", pid))
 		p.Cwd = readLinkPtr(fmt.Sprintf("/proc/%d/cwd", pid))
-		p.Command = readCmdline(pid)
+		p.Command = reader.cmdline(pid)
 		p.KernelThread = p.Command == "" && p.Exe == nil
-		p.Unit = readUnit(pid)
+		p.Unit = reader.unit(pid)
 		p.Windows = []WindowRef{}
 		io := readProcIO(pid)
 		pr.read = io.read
@@ -323,55 +328,110 @@ type procStatus struct {
 	threads                 uint64
 }
 
-func readProcStatus(pid int) procStatus {
-	var s procStatus
-	values := map[string]uint64{}
-	f, e := os.Open(fmt.Sprintf("/proc/%d/status", pid))
-	if e != nil {
-		return s
+type procReader struct{ buf []byte }
+
+func (r *procReader) file(pid int, name string) ([]byte, bool) {
+	f, err := os.Open("/proc/" + strconv.Itoa(pid) + "/" + name)
+	if err != nil {
+		return nil, false
 	}
 	defer f.Close()
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		line := sc.Text()
-		fields := strings.Fields(line)
-		if len(fields) < 2 {
-			continue
+	if cap(r.buf) < 4096 {
+		r.buf = make([]byte, 4096)
+	}
+	r.buf = r.buf[:cap(r.buf)]
+	n := 0
+	for {
+		if n == len(r.buf) {
+			r.buf = append(r.buf, 0)
+			r.buf = r.buf[:cap(r.buf)]
 		}
-		key := strings.TrimSuffix(fields[0], ":")
-		if key == "Uid" {
-			u, _ := strconv.ParseUint(fields[1], 10, 32)
-			s.uid = uint32(u)
-			continue
-		}
-		if key == "Threads" {
-			s.threads, _ = strconv.ParseUint(fields[1], 10, 64)
-			continue
-		}
-		if strings.HasPrefix(key, "Vm") || strings.HasPrefix(key, "Rss") {
-			v, _ := strconv.ParseUint(fields[1], 10, 64)
-			values[key] = v * 1024
+		m, err := f.Read(r.buf[n:])
+		n += m
+		if err != nil || m == 0 {
+			break
 		}
 	}
-	s.rss = values["VmRSS"]
-	priv := values["RssAnon"] + values["RssShmem"]
+	return r.buf[:n], true
+}
+
+func eachLine(b []byte, visit func(line []byte)) {
+	for len(b) > 0 {
+		i := bytes.IndexByte(b, '\n')
+		if i < 0 {
+			visit(b)
+			return
+		}
+		visit(b[:i])
+		b = b[i+1:]
+	}
+}
+
+func (r *procReader) status(pid int) procStatus {
+	b, ok := r.file(pid, "status")
+	if !ok {
+		return procStatus{}
+	}
+	return parseStatus(b)
+}
+
+func parseStatus(b []byte) procStatus {
+	var s procStatus
+	var anon, file, shmem, swap uint64
+	var hasAnon, hasFile, hasShmem, hasSwap bool
+	eachLine(b, func(line []byte) {
+		colon := bytes.IndexByte(line, ':')
+		if colon < 0 {
+			return
+		}
+		rest := line[colon+1:]
+		switch string(line[:colon]) {
+		case "Uid":
+			s.uid = uint32(firstNumber(rest))
+		case "Threads":
+			s.threads = firstNumber(rest)
+		case "VmRSS":
+			s.rss = firstNumber(rest) * 1024
+		case "RssAnon":
+			anon, hasAnon = firstNumber(rest)*1024, true
+		case "RssFile":
+			file, hasFile = firstNumber(rest)*1024, true
+		case "RssShmem":
+			shmem, hasShmem = firstNumber(rest)*1024, true
+		case "VmSwap":
+			swap, hasSwap = firstNumber(rest)*1024, true
+		}
+	})
+	priv := anon + shmem
 	if priv == 0 {
 		priv = s.rss
 	}
 	s.private = priv
-	if v, ok := values["RssAnon"]; ok {
-		s.anon = u64p(v)
+	if hasAnon {
+		s.anon = u64p(anon)
 	}
-	if v, ok := values["RssFile"]; ok {
-		s.file = u64p(v)
+	if hasFile {
+		s.file = u64p(file)
 	}
-	if v, ok := values["RssShmem"]; ok {
-		s.shmem = u64p(v)
+	if hasShmem {
+		s.shmem = u64p(shmem)
 	}
-	if v, ok := values["VmSwap"]; ok {
-		s.swap = u64p(v)
+	if hasSwap {
+		s.swap = u64p(swap)
 	}
 	return s
+}
+
+func firstNumber(b []byte) uint64 {
+	i := 0
+	for i < len(b) && (b[i] == ' ' || b[i] == '\t') {
+		i++
+	}
+	var v uint64
+	for ; i < len(b) && b[i] >= '0' && b[i] <= '9'; i++ {
+		v = v*10 + uint64(b[i]-'0')
+	}
+	return v
 }
 
 const userHz = 100
@@ -420,6 +480,26 @@ func readBootTime() uint64 {
 	return 0
 }
 
+func statFields(line string, out *[37]string) bool {
+	i, n := 0, 0
+	for n < len(out) {
+		for i < len(line) && line[i] == ' ' {
+			i++
+		}
+		if i >= len(line) {
+			return false
+		}
+		j := i
+		for j < len(line) && line[j] != ' ' {
+			j++
+		}
+		out[n] = line[i:j]
+		n++
+		i = j
+	}
+	return true
+}
+
 func parseProcess(pid int, raw string) (ProcessInfo, procRaw, bool) {
 	open := strings.IndexByte(raw, '(')
 	close := strings.LastIndex(raw, ") ")
@@ -427,8 +507,8 @@ func parseProcess(pid int, raw string) (ProcessInfo, procRaw, bool) {
 		return ProcessInfo{}, procRaw{}, false
 	}
 	name := raw[open+1 : close]
-	f := strings.Fields(raw[close+2:])
-	if len(f) < 37 {
+	var f [37]string
+	if !statFields(raw[close+2:], &f) {
 		return ProcessInfo{}, procRaw{}, false
 	}
 	ppid, _ := strconv.Atoi(f[1])
@@ -469,29 +549,36 @@ func readProcIO(pid int) (r struct {
 	}
 	return
 }
-func readCmdline(pid int) string {
-	b, e := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid))
-	if e != nil || len(b) == 0 {
+func (r *procReader) cmdline(pid int) string {
+	b, ok := r.file(pid, "cmdline")
+	if !ok || len(b) == 0 {
 		return ""
 	}
 	return strings.Join(strings.Split(strings.TrimRight(string(b), "\x00"), "\x00"), " ")
 }
-func readUnit(pid int) *string {
-	b, e := os.ReadFile(fmt.Sprintf("/proc/%d/cgroup", pid))
-	if e != nil {
+func (r *procReader) unit(pid int) *string {
+	b, ok := r.file(pid, "cgroup")
+	if !ok {
 		return nil
 	}
-	for _, l := range strings.Split(string(b), "\n") {
-		if _, path, ok := strings.Cut(l, "::"); ok {
-			for _, part := range strings.Split(path, "/") {
-				if strings.HasSuffix(part, ".service") || strings.HasSuffix(part, ".scope") {
-					v := part
-					return &v
-				}
+	var found *string
+	eachLine(b, func(line []byte) {
+		if found != nil {
+			return
+		}
+		_, path, ok := strings.Cut(string(line), "::")
+		if !ok {
+			return
+		}
+		for _, part := range strings.Split(path, "/") {
+			if strings.HasSuffix(part, ".service") || strings.HasSuffix(part, ".scope") {
+				v := part
+				found = &v
+				return
 			}
 		}
-	}
-	return nil
+	})
+	return found
 }
 func processStartTime(pid int) (uint64, bool) {
 	b, e := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
@@ -561,7 +648,7 @@ func safeDelta(a, b uint64) uint64 {
 	return 0
 }
 func groupProcesses(processes []ProcessInfo) ([]ProcessGroup, map[string]string) {
-	desktops := scanDesktopEntries()
+	desktops := desktopEntries()
 	groups := map[string]*ProcessGroup{}
 	icons := map[string]string{}
 	for _, p := range processes {
@@ -673,13 +760,45 @@ func groupProcesses(processes []ProcessInfo) ([]ProcessGroup, map[string]string)
 
 type desktopEntry struct{ id, name, icon string }
 
-func scanDesktopEntries() map[string]desktopEntry {
-	out := map[string]desktopEntry{}
+var (
+	desktopMu    sync.Mutex
+	desktopCache map[string]desktopEntry
+	desktopStamp string
+)
+
+func desktopEntries() map[string]desktopEntry {
+	desktopMu.Lock()
+	defer desktopMu.Unlock()
+	if stamp := desktopStamps(); desktopCache == nil || stamp != desktopStamp {
+		desktopStamp = stamp
+		desktopCache = scanDesktopEntries()
+	}
+	return desktopCache
+}
+
+func desktopDirs() []string {
 	dirs := []string{"/run/current-system/sw/share/applications", "/usr/share/applications"}
 	if h, e := os.UserHomeDir(); e == nil {
 		dirs = append([]string{filepath.Join(h, ".local/share/applications")}, dirs...)
 	}
-	for _, dir := range dirs {
+	return dirs
+}
+
+func desktopStamps() string {
+	var b strings.Builder
+	for _, dir := range desktopDirs() {
+		fi, err := os.Stat(dir)
+		if err != nil {
+			continue
+		}
+		fmt.Fprintf(&b, "%s=%d;", dir, fi.ModTime().UnixNano())
+	}
+	return b.String()
+}
+
+func scanDesktopEntries() map[string]desktopEntry {
+	out := map[string]desktopEntry{}
+	for _, dir := range desktopDirs() {
 		entries, _ := os.ReadDir(dir)
 		for _, e := range entries {
 			if e.IsDir() || !strings.HasSuffix(e.Name(), ".desktop") {
@@ -1361,12 +1480,24 @@ func readOpenFiles() (*uint64, *uint64) {
 	m, _ := strconv.ParseUint(f[2], 10, 64)
 	return &a, &m
 }
+
+var (
+	userMu    sync.Mutex
+	userNames = map[uint32]string{}
+)
+
 func userName(uid uint32) string {
-	u, e := user.LookupId(strconv.FormatUint(uint64(uid), 10))
-	if e == nil {
-		return u.Username
+	userMu.Lock()
+	defer userMu.Unlock()
+	if name, ok := userNames[uid]; ok {
+		return name
 	}
-	return strconv.FormatUint(uint64(uid), 10)
+	name := strconv.FormatUint(uint64(uid), 10)
+	if u, e := user.LookupId(name); e == nil {
+		name = u.Username
+	}
+	userNames[uid] = name
+	return name
 }
 func readLinkPtr(path string) *string {
 	p, e := os.Readlink(path)
