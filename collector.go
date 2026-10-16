@@ -92,7 +92,60 @@ func (c *Collector) Snapshot() Snapshot {
 		"ctxSwitches":          "exact memory and counters are read for the inspected process",
 		"oomScore":             "exact memory and counters are read for the inspected process",
 	}
-	return Snapshot{TimestampMS: now.UnixMilli(), SampleMS: sampleMS, Accent: ryokuAccent(), WindowsSource: windowsSource, SelfPID: os.Getpid(), CPU: cpu, Memory: memory, Disks: disks, Networks: networks, GPUs: gpus, Energy: energy, Thermal: thermal, ProcessCount: len(processes), Groups: groups, System: readSystemInfo(cpu), Limits: limits}
+	snapshot := Snapshot{TimestampMS: now.UnixMilli(), SampleMS: sampleMS, Accent: ryokuAccent(), WindowsSource: windowsSource, SelfPID: os.Getpid(), CPU: cpu, Memory: memory, Disks: disks, Networks: networks, GPUs: gpus, Energy: energy, Thermal: thermal, ProcessCount: len(processes), Groups: groups, System: readSystemInfo(cpu), Limits: limits}
+	normalizeSnapshotCollections(&snapshot)
+	return snapshot
+}
+
+func normalizeSnapshotCollections(snapshot *Snapshot) {
+	if snapshot.CPU.Cores == nil {
+		snapshot.CPU.Cores = []CpuCore{}
+	}
+	if snapshot.CPU.Caches == nil {
+		snapshot.CPU.Caches = []CpuCache{}
+	}
+	if snapshot.Disks == nil {
+		snapshot.Disks = []DiskInfo{}
+	}
+	for i := range snapshot.Disks {
+		if snapshot.Disks[i].Mounts == nil {
+			snapshot.Disks[i].Mounts = []DiskMount{}
+		}
+	}
+	if snapshot.Networks == nil {
+		snapshot.Networks = []NetworkInfo{}
+	}
+	for i := range snapshot.Networks {
+		if snapshot.Networks[i].IPv4 == nil {
+			snapshot.Networks[i].IPv4 = []string{}
+		}
+		if snapshot.Networks[i].IPv6 == nil {
+			snapshot.Networks[i].IPv6 = []string{}
+		}
+	}
+	if snapshot.GPUs == nil {
+		snapshot.GPUs = []GpuInfo{}
+	}
+	if snapshot.Thermal.Sensors == nil {
+		snapshot.Thermal.Sensors = []ThermalSensor{}
+	}
+	if snapshot.Groups == nil {
+		snapshot.Groups = []ProcessGroup{}
+	}
+	for groupIndex := range snapshot.Groups {
+		group := &snapshot.Groups[groupIndex]
+		if group.Windows == nil {
+			group.Windows = []WindowRef{}
+		}
+		if group.Members == nil {
+			group.Members = []ProcessInfo{}
+		}
+		for memberIndex := range group.Members {
+			if group.Members[memberIndex].Windows == nil {
+				group.Members[memberIndex].Windows = []WindowRef{}
+			}
+		}
+	}
 }
 
 func (c *Collector) Process(pid int, start uint64) (ProcessInfo, bool) {
@@ -1331,23 +1384,91 @@ func readEnergy() EnergyInfo {
 	return e
 }
 func readThermals() ThermalInfo {
-	var sensors []ThermalSensor
-	zones, _ := filepath.Glob("/sys/class/thermal/thermal_zone*")
-	for _, z := range zones {
-		temp := float64(readInt(filepath.Join(z, "temp"))) / 1000
-		if temp <= 0 {
-			continue
+	return readThermalsIn("/sys/class/thermal", "/sys/class/hwmon")
+}
+
+func readThermalsIn(thermalRoot, hwmonRoot string) ThermalInfo {
+	sensors := []ThermalSensor{}
+
+	hwmons, _ := filepath.Glob(filepath.Join(hwmonRoot, "hwmon*"))
+	sort.Strings(hwmons)
+
+	for _, hwmon := range hwmons {
+		chip := fallback(readString(filepath.Join(hwmon, "name")), filepath.Base(hwmon))
+
+		inputs, _ := filepath.Glob(filepath.Join(hwmon, "temp*_input"))
+		sort.Strings(inputs)
+
+		for _, input := range inputs {
+			temperature := readMilliCelsius(input)
+			if temperature == nil {
+				continue
+			}
+
+			prefix := strings.TrimSuffix(input, "_input")
+			label := fallback(readString(prefix+"_label"), filepath.Base(prefix))
+
+			sensors = append(sensors, ThermalSensor{
+				ID:          "hwmon:" + filepath.Base(hwmon) + ":" + filepath.Base(prefix),
+				Chip:        chip,
+				Label:       label,
+				Temperature: *temperature,
+				Max:         readMilliCelsius(prefix + "_max"),
+				Critical:    readMilliCelsius(prefix + "_crit"),
+			})
 		}
-		label := readString(filepath.Join(z, "type"))
-		sensors = append(sensors, ThermalSensor{ID: filepath.Base(z), Chip: label, Label: label, Temperature: temp})
 	}
-	sort.Slice(sensors, func(i, j int) bool { return sensors[i].Temperature > sensors[j].Temperature })
-	var hot *ThermalSensor
+
+	if len(sensors) == 0 {
+		zones, _ := filepath.Glob(filepath.Join(thermalRoot, "thermal_zone*"))
+		sort.Strings(zones)
+
+		for _, zone := range zones {
+			temperature := readMilliCelsius(filepath.Join(zone, "temp"))
+			if temperature == nil {
+				continue
+			}
+
+			label := fallback(readString(filepath.Join(zone, "type")), filepath.Base(zone))
+
+			sensors = append(sensors, ThermalSensor{
+				ID:          filepath.Base(zone),
+				Chip:        label,
+				Label:       label,
+				Temperature: *temperature,
+			})
+		}
+	}
+
+	sort.Slice(sensors, func(i, j int) bool {
+		return sensors[i].Temperature > sensors[j].Temperature
+	})
+
+	var hotspot *ThermalSensor
 	if len(sensors) > 0 {
-		v := sensors[0]
-		hot = &v
+		value := sensors[0]
+		hotspot = &value
 	}
-	return ThermalInfo{Hotspot: hot, Sensors: sensors}
+
+	return ThermalInfo{
+		Hotspot: hotspot,
+		Sensors: sensors,
+	}
+}
+
+func readMilliCelsius(path string) *float64 {
+	raw := readString(path)
+	if raw == "" {
+		return nil
+	}
+
+	milli, err := strconv.ParseFloat(raw, 64)
+	if err != nil || milli <= 0 {
+		return nil
+	}
+
+	value := milli / 1000
+	return &value
 }
 func readSystemInfo(cpu CpuInfo) SystemInfo {
 	host, _ := os.Hostname()

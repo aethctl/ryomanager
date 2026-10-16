@@ -27,6 +27,39 @@
     selectedGroup: [], selectedProcess: [],
   });
 
+  function normalizeSnapshot(next: Snapshot): Snapshot {
+    return {
+      ...next,
+      cpu: {
+        ...next.cpu,
+        cores: next.cpu?.cores ?? [],
+        caches: next.cpu?.caches ?? [],
+      },
+      disks: (next.disks ?? []).map((disk) => ({
+        ...disk,
+        mounts: disk.mounts ?? [],
+      })),
+      networks: (next.networks ?? []).map((network) => ({
+        ...network,
+        ipv4: network.ipv4 ?? [],
+        ipv6: network.ipv6 ?? [],
+      })),
+      gpus: next.gpus ?? [],
+      thermal: {
+        hotspot: next.thermal?.hotspot ?? null,
+        sensors: next.thermal?.sensors ?? [],
+      },
+      groups: (next.groups ?? []).map((group) => ({
+        ...group,
+        windows: group.windows ?? [],
+        members: (group.members ?? []).map((member) => ({
+          ...member,
+          windows: member.windows ?? [],
+        })),
+      })),
+    };
+  }
+
   const append = (series: Series, value: number | null) => [...series, value].slice(-historyLimit);
   const pad = (length: number): Series => Array(Math.min(historyLimit, length)).fill(null);
   const pct = (value: number) => `${Math.max(0, value).toFixed(value >= 10 ? 0 : 1)}%`;
@@ -130,7 +163,7 @@
 
   async function refresh() {
     try {
-      const next = await invoke<Snapshot>("snapshot");
+      const next = normalizeSnapshot(await invoke<Snapshot>("snapshot"));
       snapshot = next;
       appendSnapshot(next);
       error = "";
